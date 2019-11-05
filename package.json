@@ -5,8 +5,10 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "prestart": "npm update && npm audit fix",
-    "start": "node index.js"
+    "prestart": "npm run update",
+    "start": "node index.js",
+    "quickstart": "node index.js",
+    "update": "npm install && npm prune && npm update && npm audit fix"
   },
   "repository": {
     "type": "git",
@@ -19,7 +21,13 @@
   },
   "homepage": "https://github.com/coblmeli/house-listing-predictor#readme",
   "dependencies": {
+    "csv-parser": "^2.3.1",
     "dotenv": "^8.2.0",
     "request": "^2.88.0"
+  },
+  "devDependencies": {
+    "eslint": "^6.6.0",
+    "eslint-config-airbnb-base": "^14.0.0",
+    "eslint-plugin-import": "^2.18.2"
   }
 }

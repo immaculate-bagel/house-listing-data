@@ -1,92 +1,86 @@
-require("dotenv").config({ path: ".env" });
+require('dotenv').config({ path: '.env' });
 
-var request = require("request");
-var fs = require("fs");
+const request = require('request');
+const fs = require('fs');
+const csv = require('csv-parser');
 
-// Set your API parameters here.
-var API_token = process.env.API_TOKEN;
-var view_name = "property_flat_prices";
-var format = "CSV";
-var query = 'country:US AND propertyType:"Single Family Dwelling"';
-var num_records = 1;
-var download = true;
+const zipCodes = [];
 
-var request_options = {
-  url: "https://api.datafiniti.co/v4/properties/search",
-  method: "POST",
-  json: {
-    query: query,
-    num_records: num_records,
-    view_name: view_name,
-    format: format,
-    download: download
-  },
-  headers: {
-    Authorization: "Bearer " + API_token,
-    "Content-Type": "application/json"
-  }
-};
-
-console.log(request_options);
-
-// A function to check if a download request has completed
-function checkDownloadUntilComplete(options, callback) {
-  var download_id = options.download_id;
-  var download_options = {
-    url: "https://api.datafiniti.co/v4/downloads/" + download_id,
-    method: "GET",
-    headers: {
-      Authorization: "Bearer " + API_token,
-      "Content-Type": "application/json"
-    }
-  };
-
-  request(download_options, async function(error, response, body) {
-    var num_files_downloaded = 0;
-    var download_response = JSON.parse(body);
-    console.log(download_response);
-    console.log("Records downloaded: " + download_response.num_downloaded);
-    if (download_response.status !== "completed") {
-      // NEED A SLEEP FUNCTION HERE!
-      await sleep(5000);
-      checkDownloadUntilComplete(options, callback);
-    } else {
-      var results = download_response.results;
-      console.log(results);
-      for (var i = 0; i < results.length; i++) {
-        var filename = download_id + "_" + i + "." + format;
-        var file = fs.createWriteStream(filename);
-        request(results[i])
-          .pipe(file)
-          .on("end", function() {
-            console.log(
-              "File " +
-                (i + 1) +
-                " out of " +
-                results.length +
-                " saved: " +
-                filename
-            );
-            num_files_downloaded++;
-            if (num_files_downloaded === results.length) process.exit();
-          });
-      }
-    }
-  });
-}
-
-// Initiate the download request.
-request(request_options, function(error, response, body) {
-  var request_response = body;
-  var download_id = request_response.id;
-
-  // Check on status of the download request.
-  checkDownloadUntilComplete({ download_id: download_id }, function(
-    error,
-    response
-  ) {});
-});
+const { APIToken } = process.env;
+const format = 'CSV';
+const view = 'property_flat_prices';
+const download = true;
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+fs.createReadStream('zipcodes.csv')
+  .pipe(csv())
+  .on('data', (data) => zipCodes.push(`postalCode:${data.zip}`))
+  .on('end', () => {
+    const requestOptions = {
+      url: 'https://api.datafiniti.co/v4/properties/search',
+      method: 'POST',
+      json: {
+        query: `(${zipCodes.join(
+          ' OR ',
+        )}) AND propertyType:"Single Family Dwelling"`,
+        format,
+        num_records: 1,
+        view,
+        download,
+      },
+      headers: {
+        Authorization: `Bearer ${APIToken}`,
+        'Content-Type': 'application/json',
+      },
+    };
+
+    // A function to check if a download request has completed
+    function checkDownloadUntilComplete(options, callback) {
+      const { downloadId } = options;
+      const downloadOptions = {
+        url: `https://api.datafiniti.co/v4/downloads/${downloadId}`,
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${APIToken}`,
+          'Content-Type': 'application/json',
+        },
+      };
+
+      request(downloadOptions, async (error, response, body) => {
+        let numFilesDownloaded = 0;
+        const downloadResponse = JSON.parse(body);
+        if (downloadResponse.status !== 'completed') {
+          // NEED A SLEEP FUNCTION HERE!
+          await sleep(5000);
+          checkDownloadUntilComplete(options, callback);
+        } else {
+          const { results } = downloadResponse;
+          for (let i = 0; i < results.length; i++) {
+            const filename = `${downloadId}_${i}.${format}`;
+            const file = fs.createWriteStream(filename);
+            request(results[i])
+              .pipe(file)
+              .on('end', () => {
+                numFilesDownloaded += 1;
+                if (numFilesDownloaded === results.length) {
+                  process.exit();
+                }
+              });
+          }
+        }
+      });
+    }
+
+    // Initiate the download request.
+    request(requestOptions, (error, response, body) => {
+      const requestResponse = body;
+      const downloadId = requestResponse.id;
+      checkDownloadUntilComplete(
+        { downloadId },
+        (completedError, completedResponse) => {},
+      );
+    });
+  });
