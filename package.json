@@ -10,8 +10,9 @@
     "quickrequest": "node index.js",
     "preprint": "npm run update",
     "print": "node print.js",
-    "quickprint": "node print.js",
-    "update": "npm install && npm prune && npm update && npm audit fix"
+    "quickprint": "node print.js && npm run combine",
+    "update": "npm install && npm prune && npm update && npm audit fix",
+    "combine": "cd output && copy *.csv all_data.csv && cd .."
   },
   "repository": {
     "type": "git",
