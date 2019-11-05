@@ -1,40 +1,40 @@
-require('dotenv').config({ path: '.env' });
+require("dotenv").config({ path: ".env" });
 
-const request = require('request');
-const fs = require('fs');
-const csv = require('csv-parser');
+const request = require("request");
+const fs = require("fs");
+const csv = require("csv-parser");
 
 const zipCodes = [];
 
 const { APIToken } = process.env;
-const format = 'CSV';
-const view = 'property_flat_prices';
+const format = "CSV";
+const view = "property_flat_prices";
 const download = true;
 
 function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-fs.createReadStream('zipcodes.csv')
+fs.createReadStream("zipcodes.csv")
   .pipe(csv())
-  .on('data', (data) => zipCodes.push(`postalCode:${data.zip}`))
-  .on('end', () => {
+  .on("data", data => zipCodes.push(`postalCode:${data.zip}`))
+  .on("end", () => {
     const requestOptions = {
-      url: 'https://api.datafiniti.co/v4/properties/search',
-      method: 'POST',
+      url: "https://api.datafiniti.co/v4/properties/search",
+      method: "POST",
       json: {
         query: `(${zipCodes.join(
-          ' OR ',
+          " OR "
         )}) AND propertyType:"Single Family Dwelling"`,
         format,
-        num_records: 1,
+        num_records: 0,
         view,
-        download,
+        download
       },
       headers: {
         Authorization: `Bearer ${APIToken}`,
-        'Content-Type': 'application/json',
-      },
+        "Content-Type": "application/json"
+      }
     };
 
     // A function to check if a download request has completed
@@ -42,17 +42,17 @@ fs.createReadStream('zipcodes.csv')
       const { downloadId } = options;
       const downloadOptions = {
         url: `https://api.datafiniti.co/v4/downloads/${downloadId}`,
-        method: 'GET',
+        method: "GET",
         headers: {
           Authorization: `Bearer ${APIToken}`,
-          'Content-Type': 'application/json',
-        },
+          "Content-Type": "application/json"
+        }
       };
 
       request(downloadOptions, async (error, response, body) => {
         let numFilesDownloaded = 0;
         const downloadResponse = JSON.parse(body);
-        if (downloadResponse.status !== 'completed') {
+        if (downloadResponse.status !== "completed") {
           // NEED A SLEEP FUNCTION HERE!
           await sleep(5000);
           checkDownloadUntilComplete(options, callback);
@@ -63,7 +63,7 @@ fs.createReadStream('zipcodes.csv')
             const file = fs.createWriteStream(filename);
             request(results[i])
               .pipe(file)
-              .on('end', () => {
+              .on("end", () => {
                 numFilesDownloaded += 1;
                 if (numFilesDownloaded === results.length) {
                   process.exit();
@@ -80,7 +80,7 @@ fs.createReadStream('zipcodes.csv')
       const downloadId = requestResponse.id;
       checkDownloadUntilComplete(
         { downloadId },
-        (completedError, completedResponse) => {},
+        (completedError, completedResponse) => {}
       );
     });
   });
